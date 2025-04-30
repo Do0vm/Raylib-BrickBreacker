@@ -1,6 +1,7 @@
-#include "raylib.h"
 #ifndef PADDLE_H
-//#define PADDLE_H
+#define PADDLE_H
+
+#include "raylib.h"  
 
 class MovingObject {
 public:

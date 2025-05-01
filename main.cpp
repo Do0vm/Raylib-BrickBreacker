@@ -17,8 +17,8 @@ const int WINDOW_HEIGHT = 900;
 // Paddle Constants
 const float PADDLE_W = 150.0f;
 const float PADDLE_H = 10.0f;
-const float PADDLE_SPEED = 11.0f;
-const float PADDLE_DECELERATION = 0.95f;
+const float PADDLE_SPEED = 16.0f;
+const float PADDLE_DECELERATION = 0.85f;
 const float PADDLE_BOUNCE_MULTIPLIER = 0.8f; // Multiplier for paddle bounce angle
 
 // Ball Constants
@@ -36,7 +36,7 @@ const float BRICK_WIDTH = (WINDOW_WIDTH - (BRICK_COLUMNS + 1) * BRICK_GAP) / BRI
 const int SCORE_PER_BRICK = 10;
 
 // Modifier Constants
-const float MODIFIER_CHANCE = 15.0f; 
+const float MODIFIER_CHANCE = 65.0f; 
 const float MODIFIER_SPEED = 400.0f;
 const float MODIFIER_SIZE = 15.0f;
 
@@ -192,7 +192,7 @@ struct Ball {
     }
 };
 
-// ADDED: Structure for temporary text effects
+// Structure for temporary text effects
 struct FloatingText {
     Vector2 position;
     Vector2 velocity;
@@ -243,7 +243,7 @@ struct FloatingText {
 //------------------------------------------------------------------------------------
 // Global Variables (Game State)
 //------------------------------------------------------------------------------------
-// Font gameFont; // MOVED EARLIER
+// Font gameFont; 
 
 GameState currentGameState = START_SCREEN;
 Paddle playerPaddle;
@@ -255,7 +255,7 @@ std::vector<Modifier> activeModifiers;
 std::vector<FloatingText> activeTextEffects; // List to hold active text popups
 Color currentBackgroundColor = DARKGRAY;     
 const Color NORMAL_BG_COLOR = DARKGRAY;      
-const Color FLASH_BG_COLOR = RAYWHITE;       // Color to flash to on hit (can be changed)
+const Color FLASH_BG_COLOR = RED;       
 const float FLASH_DURATION = 0.1f;           // How long the flash lasts in seconds
 float backgroundFlashTimer = 0.0f;           // Timer for the flash effect
 
@@ -264,15 +264,16 @@ int highScore = 0;
 int activeBricksCount = 0;
 float gameTimer = 0.0f;
 
-// Sound (Optional - requires setup)
-// Sound fxPaddleHit;
-// Sound fxBrickHit;
-// Sound fxPowerup;
+// Sound 
+ Sound fxPaddleHit;
+ Sound fxBrickHit;
+ Sound fxPowerup;
 
 //------------------------------------------------------------------------------------
 // Function Declarations
 //------------------------------------------------------------------------------------
 void InitGame();
+void ResetBricks();
 void UpdateGame();
 void DrawGame();
 void UpdateDrawFrame();
@@ -280,7 +281,7 @@ void SpawnModifier(Vector2 position);
 //spawning text effects
 void SpawnTextEffect(Vector2 position, const std::string& text, Color color, int fontSize, Vector2 velocity, float lifeTime);
 void ActivateModifier(Modifier& mod);
-// void PlaySfx(Sound& sfx); // Optional sound function declaration
+ void PlaySfx(Sound& sfx);
 
 //------------------------------------------------------------------------------------
 // Main entry point
@@ -288,7 +289,7 @@ void ActivateModifier(Modifier& mod);
 int main() {
     // Initialization
     InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Advanced Brick Breaker - GREGlib");
-    // InitAudioDevice(); 
+     InitAudioDevice(); 
     SetTargetFPS(60);       
     srand(time(NULL));      // Seed the random number generator
 
@@ -298,10 +299,10 @@ int main() {
         gameFont = GetFontDefault(); // Use default font as fallback
     }
 
-    // Load Sounds (Optional)
-    // fxPaddleHit = LoadSound("resources/sounds/paddle_hit.wav");
-    // fxBrickHit = LoadSound("resources/sounds/brick_hit.wav");
-    // fxPowerup = LoadSound("resources/sounds/powerup.wav");
+    
+     fxPaddleHit = LoadSound("resources/sounds/paddle_hit.wav");
+     fxBrickHit = LoadSound("resources/sounds/brick_hit.wav");
+     fxPowerup = LoadSound("resources/sounds/powerup.wav");
 
     InitGame(); // Initialize the first game state
 
@@ -311,13 +312,12 @@ int main() {
     }
 
     // De-Initialization
-    // Unload Sounds (Optional)
-    // UnloadSound(fxPaddleHit);
-    // UnloadSound(fxBrickHit);
-    // UnloadSound(fxPowerup);
+     UnloadSound(fxPaddleHit);
+     UnloadSound(fxBrickHit);
+     UnloadSound(fxPowerup);
 
     UnloadFont(gameFont); 
-    // CloseAudioDevice(); // Uncomment if using sound
+     CloseAudioDevice(); 
     CloseWindow();        
 
     return 0;
@@ -332,8 +332,8 @@ void InitGame() {
     // Reset game variables
     score = 0;
     gameTimer = 0.0f;
-    activeBricksCount = 0;
-    balls.clear();         // Remove all existing balls
+    // activeBricksCount = 0; // This will be set by ResetBricks now
+    balls.clear();           // Remove all existing balls
     activeModifiers.clear(); // Remove all existing modifiers
     activeTextEffects.clear(); // Remove all existing text effects
     currentBackgroundColor = NORMAL_BG_COLOR; // Reset background color
@@ -341,42 +341,26 @@ void InitGame() {
 
     // Initialize Paddle
     playerPaddle.Init(
-        { (WINDOW_WIDTH / 2.0f) - (PADDLE_W / 2.0f), WINDOW_HEIGHT * 0.9f }, 
-        { 0.0f, 0.0f },   
-        PADDLE_W,         
-        PADDLE_H,         
-        WHITE);          
+        { (WINDOW_WIDTH / 2.0f) - (PADDLE_W / 2.0f), WINDOW_HEIGHT * 0.9f },
+        { 0.0f, 0.0f },   // Initial speed (zero)
+        PADDLE_W,
+        PADDLE_H,
+        SKYBLUE);        
 
     // Initialize Ball(s)
     Ball initialBall;
     initialBall.Init(
-        // Start slightly above paddle center
         { WINDOW_WIDTH / 2.0f, playerPaddle.GetPosition().y - PADDLE_H - BALL_RADIUS - 5 },
         INITIAL_BALL_SPEED,
-        BALL_RADIUS,        
+        BALL_RADIUS,
         Color{ 2, 222, 233, 242 } 
     );
-    balls.push_back(initialBall); 
+    balls.push_back(initialBall);
 
-    // Initialize Bricks
-    for (int r = 0; r < BRICK_ROWS; ++r) {
-        for (int c = 0; c < BRICK_COLUMNS; ++c) {
-            Vector2 brickPos = {
-                c * (BRICK_WIDTH + BRICK_GAP) + BRICK_GAP,
-                r * (BRICK_HEIGHT + BRICK_GAP) + BRICK_GAP + BRICK_TOP_OFFSET
-            };
-            Vector2 brickSize = { BRICK_WIDTH, BRICK_HEIGHT };
-            int lives = 1;
-            if (r < 1) lives = 3; 
-            else if (r < 3) lives = 2;
+    // Initialize Bricks 
+    ResetBricks();
 
-            bricks[r][c].Init(brickPos, brickSize, r, c, lives);
-            // Count active bricks
-            if (bricks[r][c].lives > 0) {
-                activeBricksCount++;
-            }
-        }
-    }
+    
 }
 
 // Update and Draw Frame 
@@ -424,7 +408,42 @@ void UpdateDrawFrame() {
         break;
     }
 }
+//------------------------------------------------------------------------------------
+// Function to Reset/Initialize Bricks
+//------------------------------------------------------------------------------------
+void ResetBricks() {
+    activeBricksCount = 0; // Reset the counter before initializing
 
+    for (int r = 0; r < BRICK_ROWS; ++r) {
+        for (int c = 0; c < BRICK_COLUMNS; ++c) {
+            Vector2 brickPos = {
+                c * (BRICK_WIDTH + BRICK_GAP) + BRICK_GAP,
+                r * (BRICK_HEIGHT + BRICK_GAP) + BRICK_GAP + BRICK_TOP_OFFSET
+            };
+            Vector2 brickSize = { BRICK_WIDTH, BRICK_HEIGHT };
+
+            // Determine lives based on row 
+            int lives = 1;
+            if (r < 1) lives = 3;       // Top row gets 3 lives
+            else if (r < 3) lives = 2; // Next two rows get 2 lives
+            // Else lives remains 1
+
+            bricks[r][c].Init(brickPos, brickSize, r, c, lives);
+
+            // Count active bricks again
+            if (bricks[r][c].lives > 0) {
+                activeBricksCount++;
+            }
+        }
+    }
+
+    // Give the player a bonus for clearing the screen
+    score += 250; // Example bonus
+    SpawnTextEffect({ WINDOW_WIDTH / 2.0f, WINDOW_HEIGHT / 3.0f }, "CLEARED! +250", GOLD, 35, { 0, -40 }, 1.5f);
+
+    // Maybe reset ball speed slightly or add a small delay?
+    // For now, we just reset the bricks.
+}
 
 // Update Game Logic for PLAYING state
 void UpdateGame() {
@@ -503,7 +522,7 @@ void UpdateGame() {
                 float speedMagnitude = sqrtf(INITIAL_BALL_SPEED.x * INITIAL_BALL_SPEED.x + INITIAL_BALL_SPEED.y * INITIAL_BALL_SPEED.y);
                 ball.speed.y = -sqrtf(fmaxf(1.0f, speedMagnitude * speedMagnitude - ball.speed.x * ball.speed.x));
 
-                // PlaySfx(fxPaddleHit); // Optional sound
+                 PlaySfx(fxPaddleHit); 
             }
         }
 
@@ -518,8 +537,19 @@ void UpdateGame() {
                         Vector2 brickCenter = { bricks[r][c].position.x + bricks[r][c].size.x / 2, bricks[r][c].position.y + bricks[r][c].size.y / 2 };
                         Color brickColor = bricks[r][c].color; // Get brick color
 
+                        Color textColor;
+                        int randColor = GetRandomValue(0, 4);
+                        switch (randColor) {
+                        case 0: textColor = GOLD; break;
+                        case 1: textColor = PURPLE; break;
+                        case 2: textColor = GREEN; break;
+                        case 3: textColor = BLUE; break;
+                        default: textColor = DARKBROWN; break;
+                        }
+
+
                         // Trigger Background Flash
-                        currentBackgroundColor = ColorBrightness(brickColor, 0.6f);
+                        currentBackgroundColor = ColorBrightness(textColor,-0.5f);
                         backgroundFlashTimer = FLASH_DURATION; // Reset flash timer
 
                         std::string hitText;
@@ -527,20 +557,24 @@ void UpdateGame() {
                         switch (randText) {
                         case 0: hitText = "+" + std::to_string(SCORE_PER_BRICK); break;
                         case 1: hitText = "POP!"; break;
-                        case 2: hitText = "BAM!"; break;
-                        case 3: hitText = "CRACK!"; break;
+                        case 2: hitText = "BAM!!!!!"; break;
+                        case 3: hitText = "CRACK!!!!!"; break;
+                        case 4: hitText = "UBISOFT HE IS AVAILABLE!!!"; break;
+                        case 5: hitText = "GREGORY.DEARHAM@LINKEDIN"; break;
                         default: hitText = "+" + std::to_string(SCORE_PER_BRICK); break;
+
+
                         }
 
                         SpawnTextEffect(brickCenter,       // Position (brick center)
                             hitText,          
-                            WHITE,            
-                            18,               
+                            textColor,            
+                            40,               
                             { (float)GetRandomValue(-20, 20), -50.0f }, 
                             0.85f);            
                         // --- End Trigger Effects ---
 
-                        // PlaySfx(fxBrickHit); 
+                         PlaySfx(fxBrickHit); 
                         bricks[r][c].Hit(); // Damage the brick
 
                         // Check if brick was destroyed by the hit
@@ -607,7 +641,7 @@ void UpdateGame() {
         if (mod.active && CheckCollisionRecs(mod.GetRect(), playerPaddle.GetPaddleRectangle())) {
             ActivateModifier(mod);
             mod.active = false;   
-            // PlaySfx(fxPowerup); // Optional sound
+             PlaySfx(fxPowerup);
         }
     }
 
@@ -632,7 +666,15 @@ void UpdateGame() {
 
     // --- Check Win Condition (No active bricks left) ---
     if (activeBricksCount <= 0 && currentGameState == PLAYING) {
-        currentGameState = GAME_OVER; // Transition to Game Over 
+        // currentGameState = GAME_OVER;
+        ResetBricks();               
+
+        
+        if (!balls.empty()) {
+             balls[0].position = { WINDOW_WIDTH / 2.0f, playerPaddle.GetPosition().y - PADDLE_H - BALL_RADIUS - 5 };
+             balls[0].speed = INITIAL_BALL_SPEED; // Or maybe slightly faster?
+        }
+        
     }
 }
 
@@ -721,19 +763,18 @@ void ActivateModifier(Modifier& mod) {
     }
     break;
     case MOD_SCORE_BONUS:
-        score += 100; // Add bonus score
+        score += 100;
         // Spawn a text effect for the score bonus
         SpawnTextEffect(mod.position, "+100!", GOLD, 24, { 0.0f, -60.0f }, 1.0f);
         break;
     case MOD_NONE:
-        // Should not happen if SpawnModifier works correctly
         break;
     }
 }
 
-// Helper to load/play sound once (Optional)
-// void PlaySfx(Sound& sfx) {
-//     if (sfx.stream.buffer != nullptr) { // Check if sound is loaded
-//         PlaySound(sfx);
-//     }
-// }
+
+ void PlaySfx(Sound& sfx) {
+     if (sfx.stream.buffer != nullptr) { // Check if sound is loaded
+         PlaySound(sfx);
+     }
+ }

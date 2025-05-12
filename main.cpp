@@ -23,7 +23,6 @@ int main() {
         UpdateDrawFrame(); // This function now handles state switching, updates, and drawing
     }
 
-    // De-Initialization
     UnloadGameResources();
     CloseAudioDevice();
     CloseWindow();

@@ -18,8 +18,8 @@ const float PADDLE_BOUNCE_MULTIPLIER = 0.8f; // Multiplier for paddle bounce ang
 
 // Ball Constants
 const float BALL_RADIUS = 10.0f;
-const Vector2 INITIAL_BALL_SPEED = { 800.0f, -800.0f };
-const float MAX_BALL_SPEED_X = 900.0f;
+const Vector2 INITIAL_BALL_SPEED = { 500.0f, -500.0f };
+const float MAX_BALL_SPEED_X = 600.0f;
 
 // Brick Constants
 const int BRICK_ROWS = 5;
